@@ -1,0 +1,45 @@
+.div {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 700px;
+  gap: 30px;
+  margin: auto;
+}
+
+.card {
+  width: 210px;
+  height: 200px;
+  box-shadow: 2px 2px 20px 1px rgb(211, 208, 208);
+  margin-top: 50px;
+}
+
+.typography {
+  padding-bottom: 40px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.fontSize {
+  font-size: 10px;
+}
+
+.content {
+  padding-top: 50px;
+}
+
+.box {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  border: 1px solid #353434;
+  padding: 15px;
+}
+
+.icon{
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }

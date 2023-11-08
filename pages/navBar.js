@@ -10,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import ShoppingBasketIcon from "@mui/icons-material/ShoppingBasket";
 import Modal from "@mui/material/Modal";
 import CloseSharpIcon from "@mui/icons-material/CloseSharp";
+import style from "./style.module.css";
 
 export default function NavBar({ addedProductCount, showProductAndCount }) {
   const [open, setOpen] = useState(false);
@@ -44,26 +45,11 @@ export default function NavBar({ addedProductCount, showProductAndCount }) {
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
       >
-        <Box
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 400,
-            height: 400,
-            bgcolor: "background.paper",
-            border: "2px solid #000",
-            boxShadow: 24,
-            p: 4,
-          }}
-        >
+        <Box className={style.box} sx={{ bgcolor: "background.paper" }}>
           <CloseSharpIcon
+            className={style.icon}
             color="action"
             sx={{
-              position: "absolute",
-              top: 8,
-              right: 8,
               "&:hover": { color: "#2a2d29" },
             }}
             onClick={handleClose}

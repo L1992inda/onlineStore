@@ -1,5 +1,6 @@
 import React from "react";
 import { useState } from "react";
+import { useEffect } from "react";
 import NavBar from "./navBar";
 import Card from "@mui/material/Card";
 import CardActions from "@mui/material/CardActions";
@@ -8,62 +9,96 @@ import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import Snackbar from "@mui/material/Snackbar";
 import Divider from "@mui/material/Divider";
+import style from "./style.module.css";
 
 export default function OnlineStore({ data }) {
   const products = data.Products;
   const suppliers = data.Suppliers;
 
   const [open, setOpen] = useState(false);
-  const [productBasket, setProductBasket] = useState([
-    {
-      name: "",
-      delivery: "",
-      addedProducts: [],
-    },
-  ]);
+  const [productMap, setProductMap] = useState(new Map());
+  const [productBasket, setProductBasket] = useState([]);
 
   const addProduct = (newProduct) => {
-    const matchcingSuppliers = findMatchingSuppliers(newProduct.Item);
+    const productName = newProduct.Name;
+    const updatedProductMap = new Map(productMap);
 
-    const delivery = matchcingSuppliers.map((supplier) => supplier.Delivery);
-    const fastestDelivery = delivery.reduce((a, b) => (a < b ? a : b));
-    const name = matchcingSuppliers.find(
-      (supplier) => supplier.Delivery === fastestDelivery
-    );
-
-    const existingProduct = productBasket.find(
-      (product) => product.name === name.Name
-    );
-
-    if (existingProduct) {
-      const updatedProductBasket = productBasket.map((product) =>
-        product.name === name.Name
-          ? {
-              ...product,
-              addedProducts: [...product.addedProducts, newProduct.Name],
-            }
-          : product
+    if (updatedProductMap.has(productName)) {
+      updatedProductMap.set(
+        productName,
+        updatedProductMap.get(productName) + 1
       );
-      setProductBasket(updatedProductBasket);
     } else {
-      const addProduct = {
-        name: name.Name,
-        delivery: fastestDelivery,
-        addedProducts: [newProduct.Name],
-      };
-      setProductBasket([...productBasket, addProduct]);
+      updatedProductMap.set(productName, 1);
     }
+
+    setProductMap(updatedProductMap);
+  };
+
+  useEffect(() => {
+    findSupplierForProducts();
+  }, [productMap]);
+
+  const findSupplierForProducts = () => {
+    const updateProductBasket = [];
+
+    for (const [key] of productMap) {
+      const foundProduct = products.find((product) => product.Name === key);
+      if (foundProduct) {
+        const matchingSuppliers = suppliers.filter((supplier) =>
+          supplier.Items.some((item) => item.Item === foundProduct.Item)
+        );
+
+        const deliveryTime = matchingSuppliers.map(
+          (supplier) => supplier.Delivery
+        );
+        const fastestDelivery = deliveryTime.reduce((a, b) => (a < b ? a : b));
+
+        const name = matchingSuppliers.find(
+          (supplier) => supplier.Delivery === fastestDelivery
+        );
+
+        if (name) {
+          let existingSupplier = updateProductBasket.find(
+            (data) => data.supplierName === name.Name
+          );
+
+          if (existingSupplier) {
+            existingSupplier.productName.push(foundProduct.Name);
+          } else {
+            updateProductBasket.push({
+              supplierName: name.Name,
+              delivery: calculateDate(name.Delivery),
+              productName: [foundProduct.Name],
+            });
+          }
+        }
+      }
+    }
+
+    setProductBasket(updateProductBasket);
+  };
+
+  const calculateDate = (deliveryTime) => {
+    const number = parseInt(deliveryTime);
+    const date = new Date();
+    date.setDate(date.getDate() + number);
+
+    const options = { day: "2-digit", month: "2-digit", year: "numeric" };
+    const formattedDate = date
+      .toLocaleDateString(undefined, options)
+      .replace(/\//g, ".");
+    return formattedDate;
   };
 
   const addedProductCount = () => {
-    let total = 0;
-
-    productBasket.map((p) => (total += p.addedProducts.length));
-
-    return total;
+    const allValues = Array.from(productMap.values());
+    let totalProducts = allValues.reduce(
+      (total, current) => total + current,
+      0
+    );
+    return totalProducts;
   };
-
-  const productBasketValue = productBasket;
 
   const findMatchingSuppliers = (productItem) => {
     const matchingSuppliers = suppliers.filter((supplier) =>
@@ -79,11 +114,11 @@ export default function OnlineStore({ data }) {
       const deliveryTime = matchingSuppliers.map(
         (supplier) => supplier.Delivery
       );
-      const fastesDelivery = deliveryTime.reduce((a, b) => (a < b ? a : b));
+      const fastestDelivery = deliveryTime.reduce((a, b) => (a < b ? a : b));
       const name = matchingSuppliers.find(
-        (supplier) => supplier.Delivery === fastesDelivery
+        (supplier) => supplier.Delivery === fastestDelivery
       );
-      return "Delivery time: " + fastesDelivery + "\n Supplier: " + name.Name;
+      return "Delivery time: " + fastestDelivery + "Supplier: " + name.Name;
     }
   };
 
@@ -110,26 +145,20 @@ export default function OnlineStore({ data }) {
   }
 
   const showProductAndCount = () => {
-    const productCounts = productBasket.reduce((count, product) => {
-      product.addedProducts.forEach((addedProduct) => {
-        if (count[addedProduct]) {
-          count[addedProduct]++;
-        } else {
-          count[addedProduct] = 1;
-        }
-      });
-      return count;
-    }, {});
-
-    const productCountValue = Object.entries(productCounts).map(
-      ([productName, count], index) => (
-        <p key={index}>
-          {productName}: {count}
-        </p>
-      )
+    return (
+      <div>
+        {productBasket.map((data, index) => (
+          <div key={index}>
+            {data.productName.map((product, i) => (
+              <p key={i}>
+                {product} - {productMap.get(product)} gab.
+              </p>
+            ))}
+            <p>Delivery: {data.delivery}</p>
+          </div>
+        ))}
+      </div>
     );
-
-    return <div>{productCountValue}</div>;
   };
 
   return (
@@ -138,34 +167,18 @@ export default function OnlineStore({ data }) {
         addedProductCount={addedProductCount()}
         showProductAndCount={showProductAndCount()}
       />
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          maxWidth: 500,
-          gap: 30,
-          margin: "auto",
-        }}
-      >
+      <div className={style.div}>
         {products.map((p) => {
           const noSupplierforProduct = findMatchingSuppliers(p.Item);
           if (noSupplierforProduct.length === 0) {
             return null;
           }
           return (
-            <Card
-              sx={{ width: 130, height: 200, boxShadow: 5, marginTop: 5 }}
-              id={p.Item}
-              key={p.Item}
-            >
-              <CardContent sx={{ paddingTop: 6 }}>
-                <Typography
-                  sx={{ paddingBottom: 4, fontSize: 18, textAlign: "center" }}
-                >
-                  {p.Name}
-                </Typography>
+            <Card className={style.card} id={p.Item} key={p.Item}>
+              <CardContent className={style.content}>
+                <Typography className={style.typography}>{p.Name}</Typography>
 
-                <Typography color="text.secondary" sx={{ fontSize: 10 }}>
+                <Typography color="text.secondary" className={style.fontSize}>
                   {fastestSupplier(findMatchingSuppliers(p.Item))}
                   <br />
                 </Typography>
