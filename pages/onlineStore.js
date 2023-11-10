@@ -15,68 +15,83 @@ export default function OnlineStore({ data }) {
   const products = data.Products;
   const suppliers = data.Suppliers;
 
-  const [open, setOpen] = useState(false);
-  const [productMap, setProductMap] = useState(new Map());
+  const [popupVisible, setPopupVisible] = useState(false);
   const [productBasket, setProductBasket] = useState([]);
+  const [productDeliveryInfo, setProductDeliveryInfo] = useState([]);
 
   const addProduct = (newProduct) => {
-    const productName = newProduct.Name;
-    const updatedProductMap = new Map(productMap);
+    const exist = productBasket.some((p) => p.item === newProduct.Item);
 
-    if (updatedProductMap.has(productName)) {
-      updatedProductMap.set(
-        productName,
-        updatedProductMap.get(productName) + 1
+    if (exist) {
+      const updateBasket = productBasket.map((p) =>
+        p.item === newProduct.Item ? { ...p, count: p.count + 1 } : p
       );
-    } else {
-      updatedProductMap.set(productName, 1);
-    }
 
-    setProductMap(updatedProductMap);
+      setProductBasket(updateBasket);
+    } else {
+      const newProductToBasket = {
+        item: newProduct.Item,
+        productName: newProduct.Name,
+        count: 1,
+      };
+      setProductBasket([...productBasket, newProductToBasket]);
+    }
+    setPopupVisible(true);
   };
 
   useEffect(() => {
     findSupplierForProducts();
-  }, [productMap]);
+  }, [productBasket]);
 
   const findSupplierForProducts = () => {
-    const updateProductBasket = [];
+    const updateDeliveryInfo = [];
 
-    for (const [key] of productMap) {
-      const foundProduct = products.find((product) => product.Name === key);
-      if (foundProduct) {
-        const matchingSuppliers = suppliers.filter((supplier) =>
-          supplier.Items.some((item) => item.Item === foundProduct.Item)
-        );
+    productBasket.forEach((product) => {
+      const matchingSuppliers = suppliers.filter((supplier) =>
+        supplier.Items.some((item) => item.Item === product.item)
+      );
 
-        const deliveryTime = matchingSuppliers.map(
-          (supplier) => supplier.Delivery
-        );
-        const fastestDelivery = deliveryTime.reduce((a, b) => (a < b ? a : b));
+      const deliveryTime = matchingSuppliers.map(
+        (supplier) => supplier.Delivery
+      );
+      const fastestDelivery = deliveryTime.reduce((a, b) => (a < b ? a : b));
 
-        const name = matchingSuppliers.find(
-          (supplier) => supplier.Delivery === fastestDelivery
-        );
+      const fastestSuppliers = matchingSuppliers.filter(
+        (supplier) => supplier.Delivery === fastestDelivery
+      );
 
-        if (name) {
-          let existingSupplier = updateProductBasket.find(
-            (data) => data.supplierName === name.Name
+      if (fastestSuppliers.length > 0) {
+        let maxdeliverableItems = 0;
+        let supplierWithMaxItems = null;
+
+        fastestSuppliers.forEach((supplier) => {
+          const supplierItems = supplier.Items.filter((item) =>
+            productBasket.some((product) => item.Item === product.item)
           );
 
-          if (existingSupplier) {
-            existingSupplier.productName.push(foundProduct.Name);
-          } else {
-            updateProductBasket.push({
-              supplierName: name.Name,
-              delivery: calculateDate(name.Delivery),
-              productName: [foundProduct.Name],
+          if (supplierItems.length > maxdeliverableItems) {
+            maxdeliverableItems = supplierItems.length;
+            supplierWithMaxItems = supplier;
+          }
+        });
+
+        if (supplierWithMaxItems) {
+          const basketItem = productBasket.find(
+            (basketItem) => basketItem.item === product.item
+          );
+
+          if (basketItem) {
+            updateDeliveryInfo.push({
+              product: basketItem.productName,
+              count: basketItem.count,
+              fastestDelivery: calculateDate(fastestDelivery),
+              supplier: supplierWithMaxItems.Name,
             });
           }
         }
       }
-    }
-
-    setProductBasket(updateProductBasket);
+    });
+    setProductDeliveryInfo(updateDeliveryInfo);
   };
 
   const calculateDate = (deliveryTime) => {
@@ -85,19 +100,15 @@ export default function OnlineStore({ data }) {
     date.setDate(date.getDate() + number);
 
     const options = { day: "2-digit", month: "2-digit", year: "numeric" };
-    const formattedDate = date
-      .toLocaleDateString(undefined, options)
-      .replace(/\//g, ".");
+    const formattedDate = date.toLocaleDateString("lv", options);
     return formattedDate;
   };
 
   const addedProductCount = () => {
-    const allValues = Array.from(productMap.values());
-    let totalProducts = allValues.reduce(
-      (total, current) => total + current,
-      0
-    );
-    return totalProducts;
+    const productCount = productBasket.reduce((current, product) => {
+      return current + product.count;
+    }, 0);
+    return productCount;
   };
 
   const findMatchingSuppliers = (productItem) => {
@@ -107,7 +118,9 @@ export default function OnlineStore({ data }) {
     return matchingSuppliers;
   };
 
-  const fastestSupplier = (matchingSuppliers) => {
+  const fastestSupplier = (productItem) => {
+    const matchingSuppliers = findMatchingSuppliers(productItem);
+
     if (matchingSuppliers.length === 0) {
       return null;
     } else {
@@ -115,51 +128,48 @@ export default function OnlineStore({ data }) {
         (supplier) => supplier.Delivery
       );
       const fastestDelivery = deliveryTime.reduce((a, b) => (a < b ? a : b));
-      const name = matchingSuppliers.find(
-        (supplier) => supplier.Delivery === fastestDelivery
-      );
-      return "Delivery time: " + fastestDelivery + "Supplier: " + name.Name;
+
+      const names = matchingSuppliers
+        .filter((supplier) => supplier.Delivery === fastestDelivery)
+        .map(
+          (supplier) =>
+            "Delivery time: " + fastestDelivery + "Supplier: " + supplier.Name
+        );
+
+      return names;
     }
   };
 
-  const handleClick = () => {
-    setOpen(true);
-  };
-
-  const handleClose = (event, reason) => {
+  const closePopupMessage = (event, reason) => {
     if (reason === "clickaway") {
       return;
     }
-    setOpen(false);
+    setPopupVisible(false);
   };
 
   function itemAddedMessage() {
     return (
       <Snackbar
-        open={open}
+        open={popupVisible}
         autoHideDuration={1500}
-        onClose={handleClose}
+        onClose={closePopupMessage}
         message="prece ielikta grozā!"
       />
     );
   }
 
-  const showProductAndCount = () => {
-    return (
-      <div>
-        {productBasket.map((data, index) => (
+  const showProductAndCount = () => (
+    <div>
+      {productDeliveryInfo.map(
+        ({ supplier, product, count, fastestDelivery, items }, index) => (
           <div key={index}>
-            {data.productName.map((product, i) => (
-              <p key={i}>
-                {product} - {productMap.get(product)} gab.
-              </p>
-            ))}
-            <p>Delivery: {data.delivery}</p>
+            <h3>{`Supplier: ${supplier}`}</h3>
+            <div>{`${product} - Count: ${count}, Delivery: ${fastestDelivery}`}</div>
           </div>
-        ))}
-      </div>
-    );
-  };
+        )
+      )}
+    </div>
+  );
 
   return (
     <div>
@@ -179,7 +189,7 @@ export default function OnlineStore({ data }) {
                 <Typography className={style.typography}>{p.Name}</Typography>
 
                 <Typography color="text.secondary" className={style.fontSize}>
-                  {fastestSupplier(findMatchingSuppliers(p.Item))}
+                  {fastestSupplier(p.Item)}
                   <br />
                 </Typography>
               </CardContent>
@@ -188,10 +198,10 @@ export default function OnlineStore({ data }) {
                 <Button
                   size="small"
                   onClick={() => {
-                    handleClick(), addProduct(p);
+                    addProduct(p);
                   }}
                 >
-                  basket
+                  add to basket
                 </Button>
               </CardActions>
             </Card>
