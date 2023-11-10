@@ -158,18 +158,40 @@ export default function OnlineStore({ data }) {
     );
   }
 
-  const showProductAndCount = () => (
-    <div>
-      {productDeliveryInfo.map(
-        ({ supplier, product, count, fastestDelivery, items }, index) => (
-          <div key={index}>
-            <h3>{`Supplier: ${supplier}`}</h3>
-            <div>{`${product} - Count: ${count}, Delivery: ${fastestDelivery}`}</div>
+  const showProductAndCount = () => {
+    const productsBySupplier = productDeliveryInfo.reduce(
+      (accumulator, { supplier, product, count, fastestDelivery }) => {
+        if (!accumulator[supplier]) {
+          accumulator[supplier] = {
+            deliveryDate: fastestDelivery,
+            products: [],
+          };
+        }
+
+        accumulator[supplier].products.push({ product, count });
+        return accumulator;
+      },
+      {}
+    );
+
+    return Object.entries(productsBySupplier).map(
+      ([supplier, { deliveryDate, products }]) => {
+        const productsInfo = products.map(({ product, count }) => (
+          <p key={product}>
+            {product} - {count}gab
+          </p>
+        ));
+        return (
+          <div key={supplier}>
+            <p>
+              {supplier} - Delivery Date: {deliveryDate}
+            </p>
+            {productsInfo}
           </div>
-        )
-      )}
-    </div>
-  );
+        );
+      }
+    );
+  };
 
   return (
     <div>
